@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="f0ae6032-7c7e-43e2-8302-a0660c70cd10" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="3e66b45f-01c4-465b-9346-c464fa6cd446" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="123456" database="test" />
+	</db:config>
+	<flow name="spluck_cloudFlow" doc:id="69873f99-edb0-4f54-bacd-45e5f7b28358" >
+		<http:listener doc:name="Listener" doc:id="59b3cb82-3e89-4941-9856-676d09ecd57a" config-ref="HTTP_Listener_config" path="/demo"/>
+<logger level="INFO" doc:name="Logger" doc:id="e3fc810d-d320-40a8-81c8-0fafb2007807" message="Start log : #[payload]"/>
+		<!-- [STUDIO:"Select"]		<db:select doc:name="Select" doc:id="2625ee7a-6e9f-4c7b-b48a-384a7c02993e" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from mani]]></db:sql>
+		</db:select> [STUDIO] -->
+		<ee:transform doc:name="Transform Message" doc:id="9a3959ac-6744-440e-b954-a08f5ee35515" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload ++ now()
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Logger" doc:id="8a067577-8c75-4536-82b2-f0f7018c512b" message="Final response :  #[payload]"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="fc574a54-bc3f-42d4-9146-8d398484f86c" type="ANY">
+				<logger level="ERROR" doc:name="Logger" doc:id="fc7601c0-fd65-481f-804a-d3b0d0258565" message='"Error Db connectivity issue"'/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="09854e05-40ab-443d-9428-e303ea2bacdc" >
+		<salesforce:basic-connection username="mani.mulesoft@gmail.com" password="Mani@123456789" securityToken="gu9bfvSbDaL6ZVg3hixhdOVR8" />
+	</salesforce:sfdc-config>
+	<flow name="sfFlow" doc:id="eba76b4b-4da2-40ff-bd7f-09e7f6ab95ff" >
+		<http:listener doc:name="Listener" doc:id="4a983bf6-ac36-4087-9111-be527759fca4" config-ref="HTTP_Listener_config" path="/sf" allowedMethods="POST">
+			<http:response statusCode="#[vars.httpStatus default 200]" />
+			<http:error-response >
+				<http:body ><![CDATA[#[payload]]]></http:body>
+			</http:error-response>
+		</http:listener>
+		<ee:transform doc:name="Set Properties" doc:id="cb0659af-c07d-4ea9-af3b-34e7abd73a6b" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="properties" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"context properties": {
+		correlationId: correlationId,
+		message: "Account creation event request received",
+		payload: payload
+	}
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Info log" doc:id="649c493a-cd96-409d-98fa-64ff4b96c0ee" message="Account creation event request received : #[vars.properties]" />
+		<ee:transform doc:name="Transform Message" doc:id="551287e9-2e07-43e3-b335-0b92672f3f47" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Name: payload.name,
+	Phone: payload.phone
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Debug log" doc:id="97f59a3c-1315-465f-adb5-d6660059d7d9" message="Debug log: #[vars.properties]"/>
+		<salesforce:create type="Account" doc:name="Create" doc:id="a99c8cbc-0216-4ffa-b2d0-4dfa27d8aca4" config-ref="Salesforce_Config">
+		</salesforce:create>
+<choice doc:name="Successful?" doc:id="8fedc3ce-de25-4c7b-bbb4-02e93eeb39e1">
+            <when expression="#[payload.successful == true]">
+                <ee:transform doc:name="Successfully Account Created" doc:id="42b08b33-4ce8-498b-8d8e-eb501e057556">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    id: payload.items[0].Id,
+    message: "Successfully Account Created"
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            
+</when>
+            <otherwise>
+                <set-variable variableName="httpStatus" value="500" doc:name="Bad Request" doc:id="4aad79d3-6f07-4bc9-9aa8-8558bdd23aad" />
+                <set-payload value='{ "message": "Failed to create new Account" }' doc:name="Failed to create account" doc:id="97311116-e7b3-434c-95b4-c421065b0ee7"
+                    mimeType="application/json" />
+				<logger level="ERROR" doc:name="Error Log" doc:id="196643a1-4faf-4586-8f78-2237608585cf" message="Error log: #[payload]"/>
+            
+</otherwise>
+        </choice>
+		<logger level="INFO" doc:name="Info log" doc:id="72d7b263-b98a-412a-8c47-9c8f5203f9bc" message="Final response: #[payload]"/>
+	</flow>
+</mule>

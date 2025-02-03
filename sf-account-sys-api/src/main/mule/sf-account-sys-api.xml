@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="739b585d-5d87-4177-9d85-84cc32da9308" >
+		<salesforce:basic-connection username="mani.mulesoft@gmail.com" password="Mani@123456789" securityToken="gu9bfvSbDaL6ZVg3hixhdOVR8" />
+	</salesforce:sfdc-config>
+	<http:listener-config name="HTTP_Listener_config1" doc:name="HTTP Listener config" doc:id="0993eb42-f495-4f16-8dd4-030b854c68ca" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="sfFlow" doc:id="17eafa4e-17f1-4369-a5ce-de93588fcd62" >
+		<http:listener doc:name="Listener" doc:id="69fe4285-20f8-420d-8272-043886f9cb6e" config-ref="HTTP_Listener_config1" path="/sf" allowedMethods="POST">
+			<http:response statusCode="#[vars.httpStatus default 200]" />
+			<http:error-response >
+				<http:body ><![CDATA[#[payload]]]></http:body>
+			</http:error-response>
+		</http:listener>
+		<ee:transform doc:name="Set Properties" doc:id="93f5eef1-fea8-48d9-9a0e-ab9376c98b48" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="properties" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"context properties": {
+		correlationId: correlationId,
+		message: "Account creation event request received",
+		payload: payload
+	}
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Info log" doc:id="c26e81c8-c83f-4348-a5c5-7ca2d2e02d1f" message="Account creation event request received : #[vars.properties]" />
+		<ee:transform doc:name="Transform Message" doc:id="9939b2d4-ee54-4d9a-9817-8123b9a51254" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Name: payload.name,
+	Phone: payload.phone
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Debug log" doc:id="b24572f0-15de-4660-a29c-c37ddb73d94e" message="Debug log: #[vars.properties]"/>
+		<salesforce:create type="Account" doc:name="Create" doc:id="d15637f8-b69c-4e57-ab14-7e96501f395e" config-ref="Salesforce_Config">
+		</salesforce:create>
+<choice doc:name="Successful?" doc:id="996fb789-fb8b-4c4a-a422-322074d47f24">
+            <when expression="#[payload.successful == true]">
+                <ee:transform doc:name="Successfully Account Created" doc:id="477634e7-5402-44f8-af3f-b02d2286c395">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    id: payload.items[0].Id,
+    message: "Successfully Account Created"
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            
+</when>
+            <otherwise>
+                <set-variable variableName="httpStatus" value="500" doc:name="Bad Request" doc:id="b64ee3cd-5e37-4dce-9e63-43fcede931b0" />
+                <set-payload value='{ "message": "Failed to create new Account" }' doc:name="Failed to create account" doc:id="b1612c35-36ff-4b50-abd0-4197f15692e3"
+                    mimeType="application/json" />
+				<logger level="ERROR" doc:name="Error Log" doc:id="d725a0fe-8c77-4522-a7cb-d2fa1cb95097" message="Error log: #[payload]"/>
+            
+</otherwise>
+        </choice>
+		<logger level="INFO" doc:name="Info log" doc:id="bfa5feb8-cb6e-4e14-a869-45b8796ab878" message="Final response: #[payload]"/>
+	</flow>
+</mule>
